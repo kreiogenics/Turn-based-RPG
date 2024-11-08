@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
+using UnityEngine.Events;
 
 public class BattleSystem : MonoBehaviour
 {
@@ -22,13 +23,15 @@ public class BattleSystem : MonoBehaviour
     [SerializeField] private List<BattleEntities> playerBattlers = new List<BattleEntities>();
 
     [Header("UI")]
-    [SerializeField] private GameObject[] enemySelectionButtons;
+    [SerializeField] private GameObject[] enemySelectionButtonsMelee;
+    [SerializeField] private GameObject[] enemySelectionButtonsRanged;
     [SerializeField] private GameObject battleMenu;
-    [SerializeField] private GameObject enemySelectionMenu;
+    [SerializeField] private GameObject enemySelectionMenuMelee;
+    [SerializeField] private GameObject enemySelectionMenuRanged;
     [SerializeField] private TextMeshProUGUI actionText;
     [SerializeField] private GameObject battleMessages;
     [SerializeField] private TextMeshProUGUI battleStatusText;
-    [SerializeField] private GameObject partyMemberList;
+    [SerializeField] private GameObject expScreen;
 
     private PartyManager partyManager;
     private EnemyManager enemyManager;
@@ -40,6 +43,7 @@ public class BattleSystem : MonoBehaviour
     private const string SUCCESSFULLY_RAN_MESSAGE = "Party ran away!";
     private const string UNSUCCESSFULLY_RAN_MESSAGE = "Party could not run away!";
     private const int TURN_DURATION = 2;
+    private const int VICTORY_DURATION = 5;
     private const int RUN_CHANCE = 50;
 
     void Start()
@@ -49,14 +53,16 @@ public class BattleSystem : MonoBehaviour
 
         CreatePartyEntities();
         CreateEnemyEntities();
+        AudioManager.PlayBattleMusic();
         ShowBattleMenu();
         DetermineBattleOrder();
-
+        
     }
 
     private IEnumerator BattleRoutine()
     {
-        enemySelectionMenu.SetActive(false);
+        enemySelectionMenuMelee.SetActive(false);
+        enemySelectionMenuRanged.SetActive(false);
         state = BattleState.Battle;
         battleMessages.SetActive(true);
 
@@ -64,7 +70,6 @@ public class BattleSystem : MonoBehaviour
         {
             if (state == BattleState.Battle && allBattlers[i].CurrentHealth > 0)
             {
-                //Debug.Break();
                 switch (allBattlers[i].BattleAction)
                 {
                     case BattleEntities.Action.MeleeAttack:
@@ -83,7 +88,7 @@ public class BattleSystem : MonoBehaviour
             }
         }
 
-       // RemoveDeadBattlers();
+        // RemoveDeadBattlers();
 
         if (state == BattleState.Battle)
         {
@@ -100,27 +105,33 @@ public class BattleSystem : MonoBehaviour
         if (allBattlers[i].IsPlayer == true)
         {
             BattleEntities currentAttacker = allBattlers[i];
-            if (allBattlers[currentAttacker.Target].CurrentHealth <= 0)
+            if (allBattlers[currentAttacker.Target].CurrentHealth <= 0 && allBattlers[currentAttacker.Target].IsPlayer == true)
             {
                 currentAttacker.SetTarget(GetRandomEnemy());
             }
             BattleEntities currentTarget = allBattlers[currentAttacker.Target];
             MeleeAttackAction(currentAttacker, currentTarget);
             yield return new WaitForSeconds(TURN_DURATION);
-            // partyMemberList.SetActive(true);
 
             if (currentTarget.CurrentHealth <= 0)
             {
                 yield return new WaitForSeconds(TURN_DURATION);
-                //enemyBattlers.Remove(currentTarget);
+                enemyBattlers.Remove(currentTarget);
+                //allBattlers.Remove(currentTarget);
 
                 if (enemyBattlers.Count <= 0)
                 {
                     state = BattleState.Won;
-                    currentAttacker.BattleVisuals.PlayVictoriousAnimation();
-                    battleStatusText.text = WIN_MESSAGE;
-                    yield return new WaitForSeconds(TURN_DURATION);
-                    SceneManager.LoadScene(OVERWORLD_SCENE);
+
+                    for (int j = 0; j < allBattlers.Count; j++)
+                    {
+                        allBattlers[j].BattleVisuals.PlayVictoriousAnimation();
+                    }
+
+                    VictorySequence();
+                    yield return new WaitForSeconds(VICTORY_DURATION);
+                    AudioManager.PlayOverworldMusic();
+                    ReturnToOverworld();
                 }
             }
 
@@ -138,7 +149,8 @@ public class BattleSystem : MonoBehaviour
             if (currentTarget.CurrentHealth <= 0)
             {
                 yield return new WaitForSeconds(TURN_DURATION);
-                //playerBattlers.Remove(currentTarget);
+                playerBattlers.Remove(currentTarget);
+                //allBattlers.Remove(currentTarget);
 
                 if (playerBattlers.Count <= 0)
                 {
@@ -155,20 +167,58 @@ public class BattleSystem : MonoBehaviour
         if (allBattlers[i].IsPlayer == true)
         {
             BattleEntities currentAttacker = allBattlers[i];
+            if (allBattlers[currentAttacker.Target].CurrentHealth <= 0 && allBattlers[currentAttacker.Target].IsPlayer == true)
+            {
+                currentAttacker.SetTarget(GetRandomEnemy());
+            }
             BattleEntities currentTarget = allBattlers[currentAttacker.Target];
             RangedAttackAction(currentAttacker, currentTarget);
             yield return new WaitForSeconds(TURN_DURATION);
-            // partyMemberList.SetActive(true);
 
             if (currentTarget.CurrentHealth <= 0)
             {
+                yield return new WaitForSeconds(TURN_DURATION);
                 enemyBattlers.Remove(currentTarget);
+                //allBattlers.Remove(currentTarget);
 
                 if (enemyBattlers.Count <= 0)
                 {
                     state = BattleState.Won;
-                    partyMemberList.SetActive(false);
-                    battleStatusText.text = WIN_MESSAGE;
+
+                    for (int j = 0; j < allBattlers.Count; j++)
+                    {
+                        allBattlers[j].BattleVisuals.PlayVictoriousAnimation();
+                    }
+
+                    VictorySequence();
+                    yield return new WaitForSeconds(VICTORY_DURATION);
+                    ReturnToOverworld();
+                }
+            }
+
+        }
+
+        if (i < allBattlers.Count && allBattlers[i].IsPlayer == false)
+        {
+            BattleEntities currentAttacker = allBattlers[i];
+            currentAttacker.SetTarget(GetRandomPartyMember());
+            BattleEntities currentTarget = allBattlers[currentAttacker.Target];
+
+            MeleeAttackAction(currentAttacker, currentTarget);
+            yield return new WaitForSeconds(TURN_DURATION);
+
+            if (currentTarget.CurrentHealth <= 0)
+            {
+                yield return new WaitForSeconds(TURN_DURATION);
+                playerBattlers.Remove(currentTarget);
+                //allBattlers.Remove(currentTarget);
+
+                if (playerBattlers.Count <= 0)
+                {
+                    state = BattleState.Lost;
+                    battleStatusText.text = LOSS_MESSAGE;
+                    yield return new WaitForSeconds(TURN_DURATION);
+                    Debug.Log("Game Over");
                 }
             }
         }
@@ -184,7 +234,7 @@ public class BattleSystem : MonoBehaviour
                 state = BattleState.Run;
                 allBattlers.Clear();
                 yield return new WaitForSeconds(TURN_DURATION);
-                SceneManager.LoadScene(OVERWORLD_SCENE);
+                ReturnToOverworld();
                 yield break;
             }
             else
@@ -195,21 +245,21 @@ public class BattleSystem : MonoBehaviour
         }
     }
 
-   /* private void RemoveDeadBattlers()
-    {
-        for (int i = 0; i < allBattlers.Count; i++)
-        {
-            if (allBattlers[i].CurrentHealth <= 0)
-            {
-                allBattlers.RemoveAt(i);
-            }
-        }
-    }*/
+    /* private void RemoveDeadBattlers()
+     {
+         for (int i = 0; i < allBattlers.Count; i++)
+         {
+             if (allBattlers[i].CurrentHealth <= 0)
+             {
+                 allBattlers.RemoveAt(i);
+             }
+         }
+     }*/
 
     private void CreatePartyEntities()
     {
         List<PartyMember> currentParty = new List<PartyMember>();
-        currentParty = partyManager.GetCurrentParty();
+        currentParty = partyManager.GetAliveParty();
 
         for (int i = 0; i < currentParty.Count; i++)
         {
@@ -222,6 +272,7 @@ public class BattleSystem : MonoBehaviour
                 partySpawnPoints[i].position, Quaternion.identity).GetComponent<BattleVisuals>();
 
             tempBattleVisuals.SetStartingValues(currentParty[i].CurrentHealth, currentParty[i].MaxHealth, currentParty[i].Level);
+            tempBattleVisuals.SetUIPlacement(i);
             tempEntity.BattleVisuals = tempBattleVisuals;
 
             allBattlers.Add(tempEntity);
@@ -258,28 +309,49 @@ public class BattleSystem : MonoBehaviour
         battleMenu.SetActive(true);
     }
 
-    public void ShowEnemySelectionMenu()
+    public void ShowEnemySelectionMenuMelee()
     {
         battleMenu.SetActive(false);
-        SetEnemySelectionButtons();
-        enemySelectionMenu.SetActive(true);
+        SetEnemySelectionButtonsMelee();
+        enemySelectionMenuMelee.SetActive(true);
     }
 
-    private void SetEnemySelectionButtons()
+    public void ShowEnemySelectionMenuRanged()
     {
-        for (int i = 0; i < enemySelectionButtons.Length; i++)
+        battleMenu.SetActive(false);
+        SetEnemySelectionButtonsRanged();
+        enemySelectionMenuRanged.SetActive(true);
+    }
+
+    private void SetEnemySelectionButtonsMelee()
+    {
+        for (int i = 0; i < enemySelectionButtonsMelee.Length; i++)
         {
-            enemySelectionButtons[i].SetActive(false);
+            enemySelectionButtonsMelee[i].SetActive(false);
         }
 
         for (int j = 0; j < enemyBattlers.Count; j++)
         {
-            enemySelectionButtons[j].SetActive(true);
-            enemySelectionButtons[j].GetComponentInChildren<TextMeshProUGUI>().text = enemyBattlers[j].Name;
+            enemySelectionButtonsMelee[j].SetActive(true);
+            enemySelectionButtonsMelee[j].GetComponentInChildren<TextMeshProUGUI>().text = enemyBattlers[j].Name;
         }
     }
 
-    public void SelectEnemy(int currentEnemy)
+    private void SetEnemySelectionButtonsRanged()
+    {
+        for (int i = 0; i < enemySelectionButtonsRanged.Length; i++)
+        {
+            enemySelectionButtonsRanged[i].SetActive(false);
+        }
+
+        for (int j = 0; j < enemyBattlers.Count; j++)
+        {
+            enemySelectionButtonsRanged[j].SetActive(true);
+            enemySelectionButtonsRanged[j].GetComponentInChildren<TextMeshProUGUI>().text = enemyBattlers[j].Name;
+        }
+    }
+
+    public void SelectEnemyMelee(int currentEnemy)
     {
         BattleEntities currentPlayerEntity = playerBattlers[currentPlayer];
         currentPlayerEntity.SetTarget(allBattlers.IndexOf(enemyBattlers[currentEnemy]));
@@ -293,14 +365,33 @@ public class BattleSystem : MonoBehaviour
         }
         else
         {
-            enemySelectionMenu.SetActive(false);
+            enemySelectionMenuMelee.SetActive(false);
+            ShowBattleMenu();
+        }
+    }
+
+    public void SelectEnemyRanged(int currentEnemy)
+    {
+        BattleEntities currentPlayerEntity = playerBattlers[currentPlayer];
+        currentPlayerEntity.SetTarget(allBattlers.IndexOf(enemyBattlers[currentEnemy]));
+
+        currentPlayerEntity.BattleAction = BattleEntities.Action.RangedAttack;
+        currentPlayer++;
+
+        if (currentPlayer >= playerBattlers.Count)
+        {
+            StartCoroutine(BattleRoutine());
+        }
+        else
+        {
+            enemySelectionMenuRanged.SetActive(false);
             ShowBattleMenu();
         }
     }
 
     private void MeleeAttackAction(BattleEntities currentAttacker, BattleEntities currentTarget)
     {
-        partyMemberList.SetActive(false);
+        //partyMemberList.SetActive(false);
         int damage = currentAttacker.Strength;
         currentAttacker.BattleVisuals.PlayMeleeAttackAnimation();
         currentTarget.CurrentHealth -= damage;
@@ -378,9 +469,29 @@ public class BattleSystem : MonoBehaviour
         }
         else
         {
-            enemySelectionMenu.SetActive(false);
+            enemySelectionMenuMelee.SetActive(false);
+            enemySelectionMenuRanged.SetActive(false);
             ShowBattleMenu();
         }
+    }
+
+    private void VictorySequence()
+    {
+        AudioManager.PlayVictoryMusic();
+        battleStatusText.text = WIN_MESSAGE;
+    }
+
+    private void ReturnToOverworld()
+    {
+        SceneManager.LoadScene(OVERWORLD_SCENE);
+        AudioManager.PlayOverworldMusic();
+    }
+
+    public void MenuBack()
+    {
+        enemySelectionMenuMelee.SetActive(false);
+        enemySelectionMenuRanged.SetActive(false);
+        ShowBattleMenu();
     }
 }
 

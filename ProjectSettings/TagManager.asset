@@ -5,11 +5,13 @@ TagManager:
   serializedVersion: 2
   tags:
   - NPCJoinable
+  - Pause Menu
+  - Portal
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Player
   - Water
   - UI
   - LongGrass

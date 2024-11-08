@@ -19,4 +19,5 @@ MonoBehaviour:
   BaseSpd: 5
   MemberBattleVisualPrefab: {fileID: 2095865704463550704, guid: 02e1f505d285bca46869bf886648080f,
     type: 3}
-  MemberOverworldVisualPrefab: {fileID: 0}
+  MemberOverworldVisualPrefab: {fileID: 8819298194175861853, guid: 142577519d6f62a4997ec9ae7a211d03,
+    type: 3}

@@ -10,7 +10,7 @@ public class JoinableCharacter : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        
+        CheckIfJoined();
     }
 
     // Update is called once per frame
@@ -28,6 +28,19 @@ public class JoinableCharacter : MonoBehaviour
         else
         {
             interactPrompt.SetActive(false);
+        }
+    }
+
+    public void CheckIfJoined()
+    {
+        List<PartyMember> currentParty = GameObject.FindFirstObjectByType<PartyManager>().GetCurrentParty();
+
+        for (int i = 0; i < currentParty.Count; i++)
+        {
+            if (currentParty[i].MemberName == MemberToJoin.MemberName)
+            {
+                gameObject.SetActive(false);
+            }
         }
     }
 }
