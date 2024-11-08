@@ -11,9 +11,16 @@ namespace RPG.Dialogue.Editor
     public class DialogueEditor : EditorWindow
     {
         Dialogue selectedDialogue = null;
+        [NonSerialized]
         GUIStyle nodeStyle;
+        [NonSerialized]
         DialogueNode draggingNode = null;
+        [NonSerialized]
         Vector2 draggingOffset;
+        [NonSerialized]
+        DialogueNode creatingNode = null;
+        [NonSerialized]
+        DialogueNode deletingNode = null;
 
         [MenuItem("Window/Dialogue Editor")]
         public static void ShowEditorWindow()
@@ -64,14 +71,29 @@ namespace RPG.Dialogue.Editor
                 ProcessEvents();
                 foreach (DialogueNode node in selectedDialogue.GetAllNodes())
                 {
-                    DrawNode(node);
                     DrawConnections(node);
+                }
 
+                foreach (DialogueNode node in selectedDialogue.GetAllNodes())
+                {
+                    DrawNode(node);
+                }
+                if (creatingNode != null)
+                {
+                    Undo.RecordObject(selectedDialogue, "Added dialogue node");
+                    selectedDialogue.CreateNode(creatingNode);
+                    creatingNode = null;
+                }
+                if (deletingNode != null)
+                {
+                    Undo.RecordObject(selectedDialogue, "Deleted dialogue node");
+                    selectedDialogue.DeleteNode(deletingNode);
+                    deletingNode = null;
                 }
             }
         }
 
-        
+
 
         private void ProcessEvents()
         {
@@ -85,7 +107,7 @@ namespace RPG.Dialogue.Editor
             }
             else if (Event.current.type == EventType.MouseDrag && draggingNode != null)
             {
-                Undo.RecordObject(selectedDialogue, "Moved dialogue node");
+                Undo.RecordObject(selectedDialogue, "Move dialogue node");
                 draggingNode.rect.position = Event.current.mousePosition + draggingOffset;
                 GUI.changed = true;
             }
@@ -100,35 +122,45 @@ namespace RPG.Dialogue.Editor
             GUILayout.BeginArea(node.rect, nodeStyle);
             EditorGUI.BeginChangeCheck();
 
-            EditorGUILayout.LabelField("Node:", EditorStyles.whiteLabel);
             string newText = EditorGUILayout.TextField(node.dialogueText);
-            string newUniqueID = EditorGUILayout.TextField(node.uniqueID);
 
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObject(selectedDialogue, "Update Dialogue Text");
 
                 node.dialogueText = newText;
-                node.uniqueID = newUniqueID;
             }
 
-            foreach(DialogueNode childNode in selectedDialogue.GetAllChildren(node))
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("Add"))
             {
-                EditorGUILayout.LabelField(childNode.dialogueText);
+                creatingNode = node;
+            }
+            if (GUILayout.Button("Delete"))
+            {
+                deletingNode = node;
             }
 
-            
+            GUILayout.EndHorizontal();
 
             GUILayout.EndArea();
         }
 
         private void DrawConnections(DialogueNode node)
         {
+            Vector3 startPosition = new Vector2(node.rect.xMax, node.rect.center.y);
+
             foreach (DialogueNode childNode in selectedDialogue.GetAllChildren(node))
             {
-                Vector3 startPosition = node.rect.center;
-                Vector3 endPosition = node.rect.center;
-                Handles.DrawBezier(startPosition, endPosition, startPosition, endPosition, Color.white, null, 4f);
+                Vector3 endPosition = new Vector2(childNode.rect.xMin, childNode.rect.center.y);
+                Vector3 controlPointOffset = new Vector2(100, 0);
+
+                Handles.DrawBezier(
+                    startPosition, endPosition,
+                    startPosition + controlPointOffset,
+                    endPosition - controlPointOffset,
+                    Color.white, null, 4f);
             }
         }
 
@@ -140,7 +172,7 @@ namespace RPG.Dialogue.Editor
                 if (node.rect.Contains(point))
                 {
                     foundNode = node;
-                }  
+                }
             }
             return foundNode;
         }

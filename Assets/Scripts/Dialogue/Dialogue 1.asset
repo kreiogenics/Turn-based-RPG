@@ -15,10 +15,13 @@ MonoBehaviour:
   nodes:
   - uniqueID: 
     dialogueText: Digimon
-    children: []
-    position:
+    children:
+    - 729264e4-2f16-419a-b345-06267ca22905
+    - 06ad3c7e-13ee-47dc-88e3-c3b00c33f615
+    - e7f84d71-099b-4da1-baa6-828647bd2432
+    rect:
       serializedVersion: 2
-      x: 10
-      y: 10
+      x: 13
+      y: 5
       width: 200
       height: 200

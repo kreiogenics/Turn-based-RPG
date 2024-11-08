@@ -9,7 +9,7 @@ namespace RPG.Dialogue
     public class Dialogue : ScriptableObject
     {
         [SerializeField]
-        List<DialogueNode> nodes;
+        List<DialogueNode> nodes = new List<DialogueNode>();
 
         Dictionary<string, DialogueNode> nodeLookUp = new Dictionary<string, DialogueNode>();
 
@@ -18,10 +18,12 @@ namespace RPG.Dialogue
         {
             if (nodes.Count == 0)
             {
+                DialogueNode rootNode = new DialogueNode();
+                rootNode.uniqueID = Guid.NewGuid().ToString();
                 nodes.Add(new DialogueNode());
             }
 
-            OnValidate();
+            
         }
 #endif
 
@@ -33,6 +35,7 @@ namespace RPG.Dialogue
                 nodeLookUp[node.uniqueID] = node;
             }
         }
+
         public IEnumerable<DialogueNode> GetAllNodes()
         {
             return nodes;
@@ -44,9 +47,7 @@ namespace RPG.Dialogue
         }
 
         public IEnumerable<DialogueNode> GetAllChildren(DialogueNode parentNode)
-        {
-            //List<DialogueNode> result = new List<DialogueNode>();
-            
+        {            
             foreach (string childID in parentNode.children)
             {
                 if (nodeLookUp.ContainsKey(childID))
@@ -54,8 +55,30 @@ namespace RPG.Dialogue
                     yield return nodeLookUp[childID];
                 }
             }
+        }
 
-           // return result;
+        public void CreateNode(DialogueNode parent)
+        {
+            DialogueNode newNode = new DialogueNode();
+            newNode.uniqueID = Guid.NewGuid().ToString();
+            parent.children.Add(newNode.uniqueID);
+            nodes.Add(newNode);
+            OnValidate();
+        }
+
+        public void DeleteNode(DialogueNode nodeToDelete)
+        {
+            nodes.Remove(nodeToDelete);
+            OnValidate();
+            CleanDanglingChildrenNodes(nodeToDelete);
+        }
+
+        private void CleanDanglingChildrenNodes(DialogueNode nodeToDelete)
+        {
+            foreach (DialogueNode node in GetAllNodes())
+            {
+                node.children.Remove(nodeToDelete.uniqueID);
+            }
         }
     }
 }

@@ -8,6 +8,6 @@ public class DialogueNode
 {
     public string uniqueID;
     public string dialogueText;
-    public string[] children;
+    public List<string> children = new List<string>();
     public Rect rect = new Rect(0, 0, 200, 200);
 }
